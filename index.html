@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#d71920">
+<title>JJ METER SERVICE</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+:root{--red:#d71920;--white:#fff;--bg:#f3f3f3;--text:#252525}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--red);color:white;padding:18px 12px;text-align:center}
+.logo{width:96px;height:96px;object-fit:contain;background:white;border:3px solid white;border-radius:20px;padding:3px}
+header h2{margin:8px 5px;font-size:23px}header small{letter-spacing:2px}
+main{max-width:650px;margin:auto;padding:12px}.card{background:white;border-radius:12px;padding:15px;margin-bottom:13px;box-shadow:0 2px 8px #0001}
+h3{color:var(--red);margin:0 0 12px}label{display:block}
+input,select{width:100%;padding:13px;border:1px solid #ccc;border-radius:8px;margin:6px 0 12px;font-size:16px;background:white}
+button{background:var(--red);color:white;border:0;padding:12px;border-radius:8px;font-size:15px;font-weight:bold;cursor:pointer;margin:3px}
+button.secondary{background:#333}button.light{background:white;color:var(--red);border:1px solid var(--red)}button.danger{background:#8d0000}
+.actions{display:flex;flex-wrap:wrap;gap:5px}.actions button{flex:1}
+.record{border:1px solid #ddd;padding:12px;border-radius:9px;margin:10px 0}
+.record strong{color:var(--red)}.status{display:inline-block;background:#ffe5e5;color:#a90008;border-radius:20px;padding:4px 9px;font-size:12px;font-weight:bold}
+#qrcode{margin:12px auto;width:max-content}#reader{width:100%;margin-top:10px}
+footer{text-align:center;color:#777;padding:20px;font-size:12px}
+@media print{body *{visibility:hidden}#printArea,#printArea *{visibility:visible}#printArea{position:absolute;left:0;top:0;width:100%;text-align:center}.noPrint{display:none}}
+</style>
+</head>
+<body>
+<header>
+<img class="logo" src="jj-meter-logo.png" alt="JJ Meter Service digital meter logo">
+<h2>JJ METER SERVICE</h2><small>DIGITAL METER MANAGEMENT</small>
+</header>
+<main>
+<section class="card">
+<h3>Customer / Meter Entry</h3>
+<label>Customer Name</label><input id="customer" placeholder="Enter customer name">
+<label>Mobile Number</label><input id="mobile" type="tel" inputmode="tel" placeholder="Enter mobile number">
+<label>Meter Name</label><input id="meter" placeholder="Example: Pulsar 150">
+<label>Status Condition</label>
+<select id="status"><option>Received</option><option>Repair</option><option>Transfer</option></select>
+<button onclick="saveRecord()" id="saveBtn" style="width:100%">SAVE METER DETAILS</button>
+<button class="light" onclick="clearForm()" style="width:100%">CLEAR FORM</button>
+</section>
+<section class="card"><h3>Search Records</h3>
+<input id="search" placeholder="Search name, mobile or meter..." oninput="showRecords()"><div id="records"></div>
+</section>
+<section class="card"><h3>QR Code Scanner</h3>
+<button onclick="startScanner()">OPEN CAMERA / SCAN QR</button><button class="secondary" onclick="stopScanner()">STOP CAMERA</button>
+<div id="reader"></div><div id="scanResult"></div>
+</section>
+<section class="card"><h3>Backup & Restore</h3>
+<div class="actions"><button onclick="backup()">BACKUP FILE</button><button class="secondary" onclick="document.getElementById('restoreFile').click()">RESTORE</button></div>
+<input type="file" id="restoreFile" accept=".json,application/json" style="display:none" onchange="restoreBackup(event)">
+<p><small>Backup downloads a JSON file to your phone's Downloads folder. Keep a separate copy safely.</small></p>
+</section>
+</main>
+<footer>JJ METER SERVICE © 2026</footer>
+<script>
+const KEY="JJ_METER_SERVICE_RECORDS";let data=JSON.parse(localStorage.getItem(KEY)||"[]");let editingId=null;let scanner=null;
+function persist(){localStorage.setItem(KEY,JSON.stringify(data))}
+function clearForm(){["customer","mobile","meter"].forEach(id=>document.getElementById(id).value="");document.getElementById("status").value="Received";editingId=null;document.getElementById("saveBtn").textContent="SAVE METER DETAILS"}
+function saveRecord(){const customer=document.getElementById("customer").value.trim(),mobile=document.getElementById("mobile").value.trim(),meter=document.getElementById("meter").value.trim(),status=document.getElementById("status").value;
+if(!customer||!mobile||!meter){alert("Please enter customer name, mobile number and meter name.");return}
+if(!/^[0-9+()\\-\\s]{7,18}$/.test(mobile)){alert("Please enter a valid mobile number.");return}
+if(editingId!==null){const item=data.find(x=>x.id===editingId);if(item)Object.assign(item,{customer,mobile,meter,status})}
+else data.unshift({id:Date.now().toString(),customer,mobile,meter,status,date:new Date().toLocaleString()});
+persist();clearForm();showRecords();alert("Meter details saved successfully.")}
+function showRecords(){const term=document.getElementById("search").value.toLowerCase(),list=document.getElementById("records");list.innerHTML="";
+data.filter(x=>[x.customer,x.mobile,x.meter,x.status].join(" ").toLowerCase().includes(term)).forEach(x=>{
+const div=document.createElement("div");div.className="record";const title=document.createElement("strong");title.textContent=x.customer;
+const info=document.createElement("p");info.textContent="Mobile: "+x.mobile+"\\nMeter: "+x.meter+"\\nDate: "+(x.date||"");info.style.whiteSpace="pre-line";
+const badge=document.createElement("span");badge.className="status";badge.textContent=x.status;
+const actions=document.createElement("div");actions.className="actions";
+actions.append(makeButton("EDIT","secondary",()=>editRecord(x.id)),makeButton("QR / PRINT","",()=>printQR(x.id)),makeButton("WHATSAPP","secondary",()=>shareWhatsApp(x.id)),makeButton("DELETE","danger",()=>deleteRecord(x.id)));
+div.append(title,info,badge,actions);list.appendChild(div)});
+if(!list.children.length)list.textContent="No records found."}
+function makeButton(label,cls,fn){const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;b.onclick=fn;return b}
+function editRecord(id){const x=data.find(a=>a.id===id);if(!x)return;document.getElementById("customer").value=x.customer;document.getElementById("mobile").value=x.mobile;document.getElementById("meter").value=x.meter;document.getElementById("status").value=x.status;editingId=id;document.getElementById("saveBtn").textContent="UPDATE DETAILS";window.scrollTo({top:0,behavior:"smooth"})}
+function deleteRecord(id){if(!confirm("Delete this meter record?"))return;data=data.filter(x=>x.id!==id);persist();showRecords()}
+function shareWhatsApp(id){const x=data.find(a=>a.id===id);if(!x)return;const msg="JJ METER SERVICE\\nCustomer: "+x.customer+"\\nMobile: "+x.mobile+"\\nMeter: "+x.meter+"\\nStatus: "+x.status+"\\nDate: "+(x.date||"");window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank")}
+function safe(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function printQR(id){const x=data.find(a=>a.id===id);if(!x)return;const payload=JSON.stringify({id:x.id,customer:x.customer,mobile:x.mobile,meter:x.meter,status:x.status});const win=window.open("","_blank");if(!win){alert("Allow pop-ups to print QR labels.");return}
+win.document.write(`<!DOCTYPE html><html><head><title>JJ Meter QR Label</title><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\\/script><style>body{text-align:center;font-family:Arial;padding:15px}h2{color:#d71920}#qrcode{display:flex;justify-content:center}</style></head><body><h2>JJ METER SERVICE</h2><p>${safe(x.customer)}</p><p>${safe(x.meter)}</p><p>${safe(x.mobile)}</p><div id="qrcode"></div><p>${safe(x.status)}</p><script>new QRCode(document.getElementById("qrcode"),{text:${JSON.stringify(payload)},width:180,height:180});setTimeout(()=>window.print(),1000);<\\/script></body></html>`);win.document.close()}
+async function startScanner(){if(!window.Html5Qrcode){alert("QR scanner library could not load. Check internet.");return}try{if(scanner)await stopScanner();scanner=new Html5Qrcode("reader");await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},decoded=>{document.getElementById("scanResult").textContent="Scanned QR: "+decoded;try{const obj=JSON.parse(decoded);if(obj.id){const found=data.find(x=>x.id===obj.id);if(found){document.getElementById("search").value=found.customer;showRecords()}}}catch(e){}stopScanner()},()=>{})}catch(e){alert("Camera error. Allow camera permission. Camera scanning requires internet for the scanner library.")}}
+async function stopScanner(){if(scanner){try{if(scanner.isScanning)await scanner.stop();await scanner.clear()}catch(e){}scanner=null}}
+function backup(){const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="JJ_METER_SERVICE_BACKUP.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function restoreBackup(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const imported=JSON.parse(reader.result);if(!Array.isArray(imported)||!imported.every(x=>x&&x.id&&x.customer&&x.mobile&&x.meter))throw new Error("Invalid backup");if(!confirm("Restore backup? Existing records will be replaced."))return;data=imported;persist();showRecords();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}finally{event.target.value=""}};reader.readAsText(file)}
+showRecords();
+</script>
+</body></html># JJ METER SERVICE — Android APK project
+
+This project builds a test/debug Android APK using GitHub Actions.
+
+## Files
+- `www/index.html` — app interface and meter record functions
+- `www/jj-meter-logo.png` — JJ digital meter logo
+- `capacitor.config.json` — Android app name and package ID
+- `.github/workflows/build-apk.yml` — automatic APK build workflow
+
+## Build on GitHub (Android phone steps)
+1. Upload the contents of this folder into the root of your GitHub repository `jithin-creator/Bike-meter-manager`. Keep the `.github/workflows/build-apk.yml` path exactly as shown.
+2. Commit the changes to the `main` branch.
+3. Open the repository on GitHub and tap **Actions**.
+4. Open **Build JJ METER SERVICE APK**. Wait for the workflow to finish with a green check mark.
+5. Under the completed run, find **Artifacts** and download `JJ-METER-SERVICE-APK`.
+6. Extract the downloaded ZIP and install `app-debug.apk`. Android may ask you to allow installation from that source.
+
+## Important
+- This creates a debug/test APK, not a Play Store release-signed APK.
+- App records are saved in this app's local storage on the phone. Do regular JSON backups using the Backup button.
+- QR libraries are loaded from the internet; QR generation/scanning needs internet access. Camera scanning requires camera permission.
+- WhatsApp sharing opens WhatsApp's share/message screen; it does not send without your confirmation.
