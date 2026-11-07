@@ -88,7 +88,8 @@ function backup(){const blob=new Blob([JSON.stringify(data,null,2)],{type:"appli
 function restoreBackup(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const imported=JSON.parse(reader.result);if(!Array.isArray(imported)||!imported.every(x=>x&&x.id&&x.customer&&x.mobile&&x.meter))throw new Error("Invalid backup");if(!confirm("Restore backup? Existing records will be replaced."))return;data=imported;persist();showRecords();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}finally{event.target.value=""}};reader.readAsText(file)}
 showRecords();
 </script>
-</body></html># JJ METER SERVICE — Android APK project
+</body></html>
+# JJ METER SERVICE — Android APK project
 
 This project builds a test/debug Android APK using GitHub Actions.
 
