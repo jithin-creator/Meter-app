@@ -1,0 +1,6 @@
+{
+  "appId": "com.jjmeterservice.app",
+  "appName": "JJ METER SERVICE",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
